@@ -1,9 +1,6 @@
 import utils.Constants;
 
-public class Cafeteria  {
-    
-    //TODO: Add other methods here
-
+public class Cafeteria {
     
     public void printSchedule() {
         System.out.println("Menu:");

@@ -1,12 +1,13 @@
 import utils.Constants;
 
-
-public class SportsCentre{
+public class SportsCentre implements Bookable {
+    private String name;
     
-    //TODO: add any extra code if needed
+    public SportsCentre(String name) {
+        this.name = name;
+    }
     
     public void printSchedule() {
-        //TODO: add any extra code if needed
         System.out.println("Facilities:");
         System.out.println(Constants.SPORTCENTRE_FORMAT_LINE);
         System.out.println(String.format(Constants.SPORTCENTRE_FORMATTER, "Gymnasium"));
@@ -17,4 +18,13 @@ public class SportsCentre{
         System.out.println(Constants.SPORTCENTRE_FORMAT_LINE);
     }
 
+    @Override
+    public void book() {
+        System.out.println("You have booked " + this.name + " for professional use.");
+    }
+
+    @Override
+    public String getBookingDetails() {
+        return "Sports Centre: " + this.name;
+    }
 }

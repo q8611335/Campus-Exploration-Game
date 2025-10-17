@@ -1,56 +1,38 @@
-
-
 import enums.MapPositionType;
+import events.Event;
 import utils.Constants;
-
+import java.util.ArrayList;
 
 public class Student {
 
     public static final String HYPHEN = "-";
-    private static int currentSessionId;
     private int row;
     private int col;
     private int hits;
     private int moves;
     private boolean sessionPaused;
-    //private final ScoreHistory history;
+    private double totalScore;
 
-    /**
-     * Constructs an object of Student. Resets and initialises the score history and other details.
-     */
     public Student() {
-        //this.history = new ScoreHistory();
         reset();
     }
 
-    /**
-     * Adds a score with place details
-     * @param place details of the place to be added to score
-     */
-    // public void addScore(Place place) {
-    //     this.history.addScore(new Score(currentSessionId, this.moves, this.hits, place.getScore(), HYPHEN, place.getName(), HYPHEN, HYPHEN));
-    // }
+    public Score createPlaceScore(Place place) {
+        double combinedScore = place.getScore() + this.totalScore;
+        this.totalScore = combinedScore;
+        return new Score(this.moves, this.hits, combinedScore, place.getName(), HYPHEN, HYPHEN, HYPHEN);
+    }
 
-    // /**
-    //  * Adds a score with place and events' details
-    //  * @param event event details to be added
-    //  * @param place place details to be added
-    //  */
-    // public void addScore(Event event, Place place) {
-    //     String timeRange = event.getStartTime() + HYPHEN + event.getEndTime();
-    //     this.history.addScore(new Score(currentSessionId, this.moves, this.hits, event.getScore(), event.getName(), place.getName(), event.getDate(), timeRange));
-    // }
+    public Score createEventScore(Event event, Place place) {
+        String timeRange = event.getStartTime() + HYPHEN + event.getEndTime();
+        double combinedScore = event.getScore() + place.getScore() + this.totalScore;
+        this.totalScore = combinedScore;
+        return new Score(this.moves, this.hits, combinedScore, place.getName(), event.getName(), event.getDate(), timeRange);
+    }
 
-    /**
-     * move the student on the campus map based on direction
-     * @param direction direction where the student to be moved.
-     * @param map copy of campus map to validate if the move is valid.
-     * @return whether a valid move has been made.
-     */
-    public boolean move(String direction, MapPosition[][] map) {
+    public boolean move(String direction, ArrayList<ArrayList<MapPosition>> map) throws MovementBlockedException {
         int newRow = this.row;
         int newCol = this.col;
-        boolean valid ;
 
         switch (direction) {
             case Constants.MOVE_UP:
@@ -70,27 +52,16 @@ public class Student {
                 return false;
         }
 
-        valid = movePlayerToNewPosition(map, newRow, newCol);
-        return valid;
+        return movePlayerToNewPosition(map, newRow, newCol);
     }
 
-    /**
-     * Prints score history for the student
-    public void printSummary() {
-        this.history.printSummary();
-    }
-     */
-
-    /**
-     * resets the student's position on the map and other details.
-     */
     public void reset() {
         this.row = 1;
         this.col = 1;
         this.moves = 0;
         this.hits = 0;
         this.sessionPaused = false;
-        currentSessionId++;
+        this.totalScore = 0;
     }
 
     public int getRow() {
@@ -101,6 +72,18 @@ public class Student {
         return this.col;
     }
 
+    public int getMoves() {
+        return this.moves;
+    }
+
+    public int getHits() {
+        return this.hits;
+    }
+
+    public double getTotalScore() {
+        return this.totalScore;
+    }
+
     public boolean isSessionPaused() {
         return this.sessionPaused;
     }
@@ -109,34 +92,27 @@ public class Student {
         this.sessionPaused = val;
     }
 
-    public int getCurrentSessionId() {
-        return currentSessionId;
-    }
-
-    //Note: the private method is at the end of the file after the public methods.
-    // moves the player to a new position on the map.
-    private boolean movePlayerToNewPosition(MapPosition[][] map, int newRow, int newCol) {
-        boolean valid;
-        if (newRow >= 1 && newRow < map.length - 1 && newCol >= 1 && newCol < map[0].length - 1) {
-            MapPosition target = map[newRow][newCol];
-            MapPositionType type = target.getType();
-
-            if (type == MapPositionType.BOUNDARY || type == MapPositionType.RESTRICTED) {
-                System.out.println("You cannot enter that area.");
-                this.hits++;
-                valid = false;
-            } else {
-                this.row = newRow;
-                this.col = newCol;
-                this.moves++;
-                valid = true;
-            }
-        } else {
-            System.out.println("You have hit the edge of the map!");
+    private boolean movePlayerToNewPosition(ArrayList<ArrayList<MapPosition>> map, int newRow, int newCol) throws MovementBlockedException {
+        if (newRow <= 0 || newRow >= map.size() - 1 || newCol <= 0 || newCol >= map.get(0).size() - 1) {
             this.hits++;
-            valid = false;
+            throw new MovementBlockedException("You have hit the edge of the map.");
         }
-        return valid;
-    }
 
+        MapPosition target = map.get(newRow).get(newCol);
+        MapPositionType type = target.getType();
+
+        if (type == MapPositionType.BOUNDARY) {
+            this.hits++;
+            throw new MovementBlockedException("You have hit the edge of the map.");
+        } else if (type == MapPositionType.RESTRICTED) {
+            this.hits++;
+            throw new MovementBlockedException("You cannot enter that area.");
+        } else {
+            this.row = newRow;
+            this.col = newCol;
+            this.moves++;
+            return true;
+        }
+    }
 }
+

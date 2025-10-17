@@ -1,113 +1,63 @@
-
 import enums.PlaceType;
 import events.Event;
+import java.util.ArrayList;
 
 public class Place {
-    private PlaceType placeType;       // LIBRARY, LECTURE_HALL, etc.
-    private String name;               // Human-readable name
-    private Event[] events;        // List of events happening at this place
-    private double score;              // Score for visiting this place
-    private int numOfEvents;
+    private PlaceType placeType;
+    private String name;
+    private ArrayList<Event> events;
+    private double score;
     private boolean visited;
 
-    /**
-     * Constructs a place object.
-     * @param placeType Type of place
-     * @param name name of the place
-     * @param score score associated with the place.
-     */
     public Place(PlaceType placeType, String name, double score) {
         this.placeType = placeType;
         this.name = name;
         this.score = score;
-        this.events = new events.Event[2];
+        this.events = new ArrayList<>();
+        this.visited = false;
     }
 
-    /**
-     * Copy constructor for Place
-     * @param place place to be copied
-     */
     public Place(Place place) {
-        if(place != null) {
+        if (place != null) {
             this.placeType = place.getPlaceType();
             this.name = place.getName();
             this.score = place.getScore();
             this.visited = place.isVisited();
-            // if (place.getEvents() != null) {
-            //     this.events = new Event[place.getEvents().length];
-            //     for (int i = 0; i < place.getEvents().length; i++) {
-            //         if( place.getEvents()[i]!= null) {
-            //             this.events[i] = new Event(place.getEvents()[i]);
-            //         }
-            //     }
-            // }
+            this.events = new ArrayList<>();
+            if (place.events != null) {
+                this.events.addAll(place.events);
+            }
         }
     }
 
-    /**
-     * Adds an event to the list of events.
-     * @param event new event to be added.
-     */
     public void addEvent(Event event) {
-        if(this.numOfEvents == this.events.length){
-            this.events = resizeArray(this.events, this.events.length* 2);
+        if (event != null) {
+            this.events.add(event);
         }
-        this.events[numOfEvents++] = event;
     }
 
-    /**
-     * gets the details of the events by event id
-     * @param id event id
-     * @return copy of Event object
-     */
-    // public Event getEventById(int id) {
-    //     if(this.events != null && this.events.length > 0 ){
-    //         for(int i = 0; i< this.events.length; i++){
-    //             if(this.events[i] != null && this.events[i].getId() == id){
-    //                 return new Event(this.events[i]); // use copy constructor to return the object to avoid privacy leak
-    //             }
-    //         }
-    //     }
-    //     return null;
-    // }
+    public Event getEventById(int id) {
+        for (Event event : this.events) {
+            if (event != null && event.getId() == id) {
+                return event;
+            }
+        }
+        return null;
+    }
 
-    /**
-     * checks if the events array still has events to be visited.
-     * @return true if events array had one or more events.
-     */
     public boolean hasEvents() {
-        if(this.events != null ){
-            for(Event event: this.events){
-                if (event != null)
-                    return true;
+        return !this.events.isEmpty();
+    }
+
+    public boolean removeEventById(int id) {
+        for (int i = 0; i < this.events.size(); i++) {
+            if (this.events.get(i) != null && this.events.get(i).getId() == id) {
+                this.events.remove(i);
+                return true;
             }
         }
         return false;
     }
-
-    /**
-     * Removes an event from a list of events by event id.
-     * @param id event id to be removed.
-     * @return whether the event has been removed.
-     */
-    // public boolean removeEventById(int id) {
-    //     boolean removed = false;
-    //     if(this.events != null && this.events.length > 0 ){
-    //         for(int i = 0; i< this.events.length; i++){
-    //             if(this.events[i] != null && this.events[i].getId() == id){
-    //                 this.events[i] = null;
-    //                 removed = true;
-    //             }
-    //             if(removed && i< this.events.length -1){ // if removed move the rest of elements one up by copying i+1 to ith position
-    //                 this.events[i] = this.events[i+1];
-    //             }
-    //         }
-    //         if(removed){
-    //             this.events[this.events.length -1] = null; // if removed (and copied) set the last position in the array to null.
-    //         }
-    //     }
-    //     return removed;
-    // }
 
     public PlaceType getPlaceType() {
         return this.placeType;
@@ -121,19 +71,9 @@ public class Place {
         return this.score;
     }
 
-    // public Event[] getEvents() {
-    //     //Note: return a copy of events
-    //     if(this.events != null) {
-    //         Event[] newEvents = new Event[this.events.length];
-    //         for (int i = 0; i < this.events.length; i++) {
-    //             if(this.events[i] != null) {
-    //                 newEvents[i] = new Event(this.events[i]); //Note: use copy constructor
-    //             }
-    //         }
-    //         return newEvents;
-    //     }
-    //     return null;
-    // }
+    public ArrayList<Event> getEvents() {
+        return new ArrayList<>(this.events);
+    }
 
     public boolean isVisited() {
         return this.visited;
@@ -143,21 +83,30 @@ public class Place {
         this.visited = visited;
     }
 
-    @Override
-    public String toString() {
-        return this.name + " (" + this.placeType + "), Score: " + this.score + ", Events: " + this.events.length;
-    }
-
-    //resize array based on the new size.
-    private Event[] resizeArray(Event[] oldArray, int newSize ) {
-        Event[] newArray = new Event[newSize];
-        for (int i = 0; i < oldArray.length; i++) {
-            newArray[i] = oldArray[i]; // no deep copying required here as it is used internally in this class.
+    public void printEventSchedule() {
+        if (this.events.isEmpty()) {
+            System.out.println("No events scheduled at this location.");
+            return;
         }
 
-        return newArray;
+        System.out.println("Event Schedule:");
+        System.out.println(utils.Constants.SCHEDULE_FORMAT_LINE);
+        for (Event event : this.events) {
+            if (event != null) {
+                System.out.println(String.format(utils.Constants.EVENT_SCHEDULE_FORMATTER, 
+                    "ID: " + event.getId(), 
+                    event.getDate(), 
+                    event.getStartTime(), 
+                    event.getEndTime(), 
+                    event.getEventDetails()));
+            }
+        }
+        System.out.println(utils.Constants.SCHEDULE_FORMAT_LINE);
     }
 
-
-
+    @Override
+    public String toString() {
+        return this.name + " (" + this.placeType + "), Score: " + this.score + ", Events: " + this.events.size();
+    }
 }
+

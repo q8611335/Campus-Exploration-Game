@@ -1,12 +1,9 @@
-
 import enums.*;
-import java.io.File;
+import events.*;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Scanner;
 import utils.*;
-
-
 
 public class CampusMap {
     private final int rows;
@@ -14,59 +11,47 @@ public class CampusMap {
     private final String mapFile;
     private final String eventsFile;
     private final int sessionId;
-    private ArrayList<ArrayList<MapPosition>> map; // TODO: convert this to an arraylist
-    private int numOfEvents;
-    private int minVisits;
+    private final String mapName;
+    private ArrayList<ArrayList<MapPosition>> map;
+    private ArrayList<Event> allEvents;
+    private ArrayList<Integer> eventRows;
+    private ArrayList<Integer> eventCols;
+    private int numOfPlacesToVisit;
+    private SessionManager sessionManager;
 
-
-    public CampusMap(int rows, int cols, int sessionId, String mapFile, String eventsFile) throws InvalidMapException {
+    public CampusMap(int rows, int cols, int sessionId, String mapFile, String eventsFile) throws InvalidMapException, IOException {
         this.rows = rows;
         this.cols = cols;
         this.sessionId = sessionId;
-        this.map = new ArrayList<ArrayList<MapPosition>>();
+        this.map = new ArrayList<>();
         this.mapFile = mapFile;
         this.eventsFile = eventsFile;
-        this.numOfEvents = 0;
-        this.minVisits = 0;
-        
-        
+        this.allEvents = new ArrayList<>();
+        this.eventRows = new ArrayList<>();
+        this.eventCols = new ArrayList<>();
+        this.numOfPlacesToVisit = 0;
 
-        if (eventsFile.contains("data/events/")) {
-            if (eventsFile.endsWith(".txt")) {
-                String eventName = eventsFile.replace("data/events/", "").replace(".txt", "");
-            }
-        }
+        this.mapName = extractMapName(mapFile);
+        this.sessionManager = new SessionManager(sessionId, this.mapName);
 
-        FileHandler fileHandler = new FileHandler();
-        if (mapFile.contains("data/maps/")) {
-            if (mapFile.endsWith(".txt")) {
-                String mapName = mapFile.replace("data/maps/", "").replace(".txt", "");
-                try {
-                    fileHandler.readFile(this.mapFile);
-                } catch (IOException e) {
-                    System.out.println("Unable to process file. Exiting program."); 
-                    return;
-                }
-            }
-        }
         initialiseMap();
-        try {
-            fillMap(this.mapFile);
-        } catch (IOException e) {
-            throw new InvalidMapException("Failed to fill map file: " + this.mapFile); // not sure
-        }
-        // try {
-        //     fillEvents(this.eventsFile);
-        // } catch (IOException e) {
-        //     throw new InvalidMapException("Failed to fill events file: " + this.eventsFile);
-        // }
-        
-
+        loadMapData();
+        loadEventsData();
+        loadSessionScores();
     }
-    
+
+    private String extractMapName(String filePath) {
+        String name = filePath;
+        if (name.contains("data/maps/")) {
+            name = name.replace("data/maps/", "");
+        }
+        if (name.endsWith(".txt")) {
+            name = name.replace(".txt", "");
+        }
+        return name;
+    }
 
     private void initialiseMap() {
-        //TODO: initialise map here based on row/col boundary edges
         for (int row = 0; row < this.rows; row++) {
             ArrayList<MapPosition> rowList = new ArrayList<>();
             for (int col = 0; col < this.cols; col++) {
@@ -83,50 +68,127 @@ public class CampusMap {
             this.map.add(rowList);
         }
     }
-     private void fillMap(String mapFile) throws IOException {
-        File file = new File(mapFile);
-        Scanner scanner = new Scanner(file);
-        if (scanner.hasNextLine()){
-            scanner.nextLine(); //skip the first line
-        }
 
-        while(scanner.hasNextLine()){
-            String line = scanner.nextLine();
-            String[] parts = line.split(",");
-            int row = Integer.parseInt(parts[0]);
-            int col = Integer.parseInt(parts[1]);
-            PlaceType placeType = PlaceType.valueOf(parts[2].toUpperCase());
-            String placeName = parts[3];
-            double score = Double.parseDouble(parts[4]);
+    private void loadMapData() throws IOException, InvalidMapException {
+        FileHandler fileHandler = new FileHandler();
+        ArrayList<String[]> mapData = fileHandler.readMapFile(this.mapFile, this.rows, this.cols);
+
+        for (String[] data : mapData) {
+            int row = Integer.parseInt(data[0].trim());
+            int col = Integer.parseInt(data[1].trim());
+            
+            MapPosition position = this.map.get(row).get(col);
+            
+            if (position.getType() == MapPositionType.PLACE || 
+                (position.getPlace() != null)) {
+                throw new InvalidMapException("Map position [" + row + "," + col + "] already occupied. Exiting program.");
+            }
+
+            PlaceType placeType = PlaceType.valueOf(data[2].trim().toUpperCase());
+            String placeName = data[3].trim();
+            double score = Double.parseDouble(data[4].trim());
+            String restricted = data[5].trim();
 
             Place place = new Place(placeType, placeName, score);
-            MapPosition position = this.map.get(row).get(col);
             position.setPlace(place);
-            position.setType(MapPositionType.PLACE);
+            
+            if (restricted.equalsIgnoreCase("yes")) {
+                position.setType(MapPositionType.RESTRICTED);
+            } else {
+                position.setType(MapPositionType.PLACE);
+                this.numOfPlacesToVisit++;
+            }
         }
     }
 
+    private void loadEventsData() throws IOException, InvalidMapException {
+        FileHandler fileHandler = new FileHandler();
+        ArrayList<String[]> eventsData = fileHandler.readEventsFile(this.eventsFile, this.rows, this.cols);
 
-   
+        for (String[] data : eventsData) {
+            int row = Integer.parseInt(data[0].trim());
+            int col = Integer.parseInt(data[1].trim());
+            
+            MapPosition position = this.map.get(row).get(col);
+            
+            if (position.getType() != MapPositionType.PLACE && position.getType() != MapPositionType.RESTRICTED) {
+                throw new InvalidMapException("No valid place at given location. Exiting program.");
+            }
+
+            Place place = position.getPlace();
+            PlaceType placeType = place.getPlaceType();
+
+            String eventTypeStr = data[2].trim().toUpperCase();
+            
+            if (position.getType() == MapPositionType.RESTRICTED) {
+                continue;
+            }
+
+            if ((eventTypeStr.equals("SEMINAR") || eventTypeStr.equals("EXAM")) && placeType != PlaceType.EVENT_HALL) {
+                throw new InvalidMapException("Event cannot be added to the place. Exiting program.");
+            }
+
+            if (eventTypeStr.equals("LECTURE") && placeType != PlaceType.LECTURE_HALL && placeType != PlaceType.EVENT_HALL) {
+                throw new InvalidMapException("Event cannot be added to the place. Exiting program.");
+            }
+
+            String date = data[3].trim();
+            String startTime = data[4].trim();
+            String endTime = data[5].trim();
+            double score = Double.parseDouble(data[6].trim());
+            String name = data[7].trim();
+            String speakerInfo = data[8].trim();
+
+            Event event = null;
+            if (eventTypeStr.equals("LECTURE")) {
+                event = new Lecture(date, startTime, endTime, score, name, speakerInfo);
+            } else if (eventTypeStr.equals("SEMINAR")) {
+                String[] speakers = speakerInfo.split("#");
+                event = new Seminar(date, startTime, endTime, score, name, speakers);
+            } else if (eventTypeStr.equals("EXAM")) {
+                event = new Exam(date, startTime, endTime, score, name);
+            }
+
+            if (event != null) {
+                place.addEvent(event);
+                this.allEvents.add(event);
+                this.eventRows.add(row);
+                this.eventCols.add(col);
+            }
+        }
+    }
+
+    private void loadSessionScores() throws IOException {
+        FileHandler fileHandler = new FileHandler();
+        ArrayList<Score> previousScores = fileHandler.readSessionScoresFile();
+        
+        if (!previousScores.isEmpty()) {
+            this.sessionManager.addPreviousSessionScores(previousScores);
+        }
+    }
 
     private void printMap(Student student) {
-        System.out.println("Map Name: " + this.mapFile.replace("data/maps/", "").replace(".txt", ""));
+        System.out.println("Map Name: " + this.mapName);
         for (int i = 0; i < this.rows; i++) {
             for (int j = 0; j < this.cols; j++) {
                 MapPosition currentPos = this.map.get(i).get(j);
                 if (student != null && i == student.getRow() && j == student.getCol()) {
                     System.out.print(Constants.PLAYER_SYMBOL + " ");
-                } else if (currentPos.getType() != MapPositionType.PLACE) {
+                } else if (currentPos.getType() != MapPositionType.PLACE && currentPos.getType() != MapPositionType.RESTRICTED) {
                     char symbol = Constants.getSymbol(currentPos.getType());
                     System.out.print(symbol + " ");
+                } else if (currentPos.getType() == MapPositionType.RESTRICTED) {
+                    System.out.print(Constants.getSymbol(MapPositionType.RESTRICTED) + " ");
                 } else {
-                    MapPosition position = currentPos;
-                    if (position.getPlace().getPlaceType() == PlaceType.CAFETERIA) {
+                    Place place = currentPos.getPlace();
+                    if (place.getPlaceType() == PlaceType.CAFETERIA) {
                         System.out.print(Constants.CAFETERIA_SYMBOL + " ");
-                    } else if (position.getPlace().getPlaceType() == PlaceType.LIBRARY) {
+                    } else if (place.getPlaceType() == PlaceType.LIBRARY) {
                         System.out.print(Constants.LIBRARY_SYMBOL + " ");
-                    } else if (position.getPlace().hasEvents()) {
-                        System.out.print(Constants.getSymbol(position.getType()) + " ");
+                    } else if (place.getPlaceType() == PlaceType.SPORTS_CENTRE) {
+                        System.out.print(Constants.SPORTS_CENTRE_SYMBOL + " ");
+                    } else if (place.hasEvents()) {
+                        System.out.print(Constants.getSymbol(MapPositionType.PLACE) + " ");
                     } else {
                         System.out.print(Constants.EMPTY_EVENT_SYMBOL + " ");
                     }
@@ -136,44 +198,84 @@ public class CampusMap {
         }
     }
 
-    // public void handleVisit(Scanner scanner, Student student) {
-    //     MapPosition current = this.map.get(student.getRow()).get(student.getCol());
+    private void handleVisit(Scanner scanner, Student student) {
+        MapPosition current = this.map.get(student.getRow()).get(student.getCol());
 
-    //     if (current.getType() == MapPositionType.RESTRICTED || current.getType() == MapPositionType.BOUNDARY) {
-    //         System.out.println("You cannot enter that area.");
-    //         return;
-    //     }
+        if (current.getType() != MapPositionType.PLACE) {
+            return;
+        }
 
-    //     if (current.getType() == MapPositionType.PLACE) {
-    //         Place place = current.getPlace();             
-    //         this.minVisits = this.minVisits - (place.isVisited() ? 0 : 1);
-    //         current.markPlaceVisited(); 
-    //         if (place.getPlaceType() == PlaceType.CAFETERIA) {
-    //             System.out.println("You can eat here if you are hungry.");
-    //             student.addScore(place);
-    //         } else if (place.getPlaceType() == PlaceType.LIBRARY) {
-    //             System.out.println("Study hard here.");
-    //             student.addScore(place);
-    //         } else if (place.getPlaceType() == PlaceType.SPORTS_CENTRE) {
-    //             System.out.println("You can exercise here.");
-    //             student.addScore(place);
-    //         } else if (place.hasEvents()) {
-    //             visitEvent(scanner, current, student);
-    //         } else {
-    //             System.out.println("Nothing happening here.");
-    //         }
-    //     }
-    // }
+        Place place = current.getPlace();
+        
+        if (!place.isVisited()) {
+            this.numOfPlacesToVisit--;
+        }
+        
+        current.markPlaceVisited();
 
-    /**
-     * Visit the campus map
-     *
-     * @param scanner Scanner object to take inputs during the navigation/visiting events
-     * @param student Student object to update.
-     */
+        if (place.getPlaceType() == PlaceType.CAFETERIA) {
+            System.out.println("You can eat here if you are hungry.");
+            Score score = student.createPlaceScore(place);
+            this.sessionManager.addScore(score);
+        } else if (place.getPlaceType() == PlaceType.LIBRARY) {
+            System.out.println("Study hard here.");
+            Score score = student.createPlaceScore(place);
+            this.sessionManager.addScore(score);
+        } else if (place.getPlaceType() == PlaceType.SPORTS_CENTRE) {
+            System.out.println("You can exercise here.");
+            Score score = student.createPlaceScore(place);
+            this.sessionManager.addScore(score);
+        } else if (place.hasEvents()) {
+            visitEvent(scanner, current, student);
+        } else {
+            System.out.println("Nothing happening here.");
+        }
+    }
+
+    private void visitEvent(Scanner scanner, MapPosition position, Student student) {
+        Place place = position.getPlace();
+        place.printEventSchedule();
+        
+        System.out.println("Enter event ID to attend (or 0 to skip):");
+        System.out.print("> ");
+        String input = scanner.nextLine().trim();
+        
+        try {
+            int eventId = Integer.parseInt(input);
+            if (eventId == 0) {
+                return;
+            }
+
+            Event event = place.getEventById(eventId);
+            if (event == null) {
+                System.out.println("Invalid event ID.");
+                return;
+            }
+
+            System.out.println("Attending: " + event.getEventDetails());
+            Score score = student.createEventScore(event, place);
+            this.sessionManager.addScore(score);
+            
+            position.removeEventById(eventId);
+            
+            for (int i = 0; i < this.allEvents.size(); i++) {
+                if (this.allEvents.get(i).getId() == eventId) {
+                    this.allEvents.remove(i);
+                    this.eventRows.remove(i);
+                    this.eventCols.remove(i);
+                    break;
+                }
+            }
+
+        } catch (NumberFormatException e) {
+            System.out.println("Invalid input.");
+        }
+    }
+
     public void visitCampus(Scanner scanner, Student student) {
         printMap(student);
         boolean sessionOver = false;
+        
         while (!sessionOver) {
             Messages.printMovementOptions();
             String input = scanner.nextLine().toUpperCase();
@@ -182,26 +284,167 @@ public class CampusMap {
                 student.setSessionPaused(true);
                 System.out.println("Session paused.");
                 sessionOver = true;
-            // } else {
-            //     boolean validMove = student.move(input, getMap());
-            //     if (validMove) {
-            //         handleVisit(scanner, student);
-            //     }
-            //     if (this.numOfEvents == 0 && this.minVisits == 0) {
-            //         System.out.println("No more places left to visit on campus. Please visit another time.");
-            //         student.reset();
-            //         //reset();
-            //         sessionOver = true;
-            //     } else {
-            //         printMap(student);
-            //     }
+            } else {
+                try {
+                    boolean validMove = student.move(input, getMap());
+                    if (validMove) {
+                        handleVisit(scanner, student);
+                    }
+                    
+                    if (this.allEvents.isEmpty() && this.numOfPlacesToVisit == 0) {
+                        System.out.println("No more places left to visit on campus. Please visit another time.");
+                        sessionOver = true;
+                    } else {
+                        printMap(student);
+                    }
+                } catch (MovementBlockedException e) {
+                    System.out.println(e.getMessage());
+                    printMap(student);
+                }
             }
         }
     }
 
-    /**
-     * return a deep copy of the map with objects constructed using copy constructors to avoid privacy leaks
-     */
+    public void printSchedule(Scanner scanner) {
+        System.out.println("Select place type to view schedule:");
+        System.out.println("1. Cafeteria");
+        System.out.println("2. Library");
+        System.out.println("3. Sports Centre");
+        System.out.println("4. Lecture Hall");
+        System.out.println("5. Event Hall");
+        System.out.print("> ");
+        
+        String choice = scanner.nextLine().trim();
+        
+        PlaceType selectedType = null;
+        switch (choice) {
+            case "1":
+                selectedType = PlaceType.CAFETERIA;
+                break;
+            case "2":
+                selectedType = PlaceType.LIBRARY;
+                System.out.println("Library has no specific schedule.");
+                return;
+            case "3":
+                selectedType = PlaceType.SPORTS_CENTRE;
+                break;
+            case "4":
+                selectedType = PlaceType.LECTURE_HALL;
+                break;
+            case "5":
+                selectedType = PlaceType.EVENT_HALL;
+                break;
+            default:
+                System.out.println("Invalid choice.");
+                return;
+        }
+
+        if (selectedType == PlaceType.CAFETERIA) {
+            Cafeteria cafeteria = new Cafeteria();
+            cafeteria.printSchedule();
+        } else if (selectedType == PlaceType.SPORTS_CENTRE) {
+            SportsCentre sportsCentre = new SportsCentre("Sports Centre");
+            sportsCentre.printSchedule();
+        } else {
+            boolean found = false;
+            for (ArrayList<MapPosition> row : this.map) {
+                for (MapPosition pos : row) {
+                    if (pos.getType() == MapPositionType.PLACE) {
+                        Place place = pos.getPlace();
+                        if (place.getPlaceType() == selectedType && place.hasEvents()) {
+                            place.printEventSchedule();
+                            found = true;
+                        }
+                    }
+                }
+            }
+            if (!found) {
+                System.out.println("No events scheduled for this place type.");
+            }
+        }
+    }
+
+    public void bookPlace(Scanner scanner) {
+        System.out.println("Select place type to book:");
+        System.out.println("1. Sports Centre");
+        System.out.println("2. Event Hall");
+        System.out.print("> ");
+        
+        String choice = scanner.nextLine().trim();
+        
+        PlaceType selectedType = null;
+        switch (choice) {
+            case "1":
+                selectedType = PlaceType.SPORTS_CENTRE;
+                break;
+            case "2":
+                selectedType = PlaceType.EVENT_HALL;
+                break;
+            default:
+                System.out.println("Invalid choice.");
+                return;
+        }
+
+        ArrayList<Bookable> bookablePlaces = new ArrayList<>();
+        for (ArrayList<MapPosition> row : this.map) {
+            for (MapPosition pos : row) {
+                if (pos.getType() == MapPositionType.PLACE) {
+                    Place place = pos.getPlace();
+                    if (place.getPlaceType() == selectedType) {
+                        if (selectedType == PlaceType.SPORTS_CENTRE) {
+                            bookablePlaces.add(new SportsCentre(place.getName()));
+                        } else if (selectedType == PlaceType.EVENT_HALL) {
+                            bookablePlaces.add(new EventHall(place.getName()));
+                        }
+                    }
+                }
+            }
+        }
+
+        if (bookablePlaces.isEmpty()) {
+            System.out.println("No bookable places of this type found.");
+            return;
+        }
+
+        System.out.println("Available places:");
+        for (int i = 0; i < bookablePlaces.size(); i++) {
+            System.out.println((i + 1) + ". " + bookablePlaces.get(i).getBookingDetails());
+        }
+        
+        System.out.print("Select a place to book: ");
+        try {
+            int placeChoice = Integer.parseInt(scanner.nextLine().trim());
+            if (placeChoice > 0 && placeChoice <= bookablePlaces.size()) {
+                bookablePlaces.get(placeChoice - 1).book();
+            } else {
+                System.out.println("Invalid choice.");
+            }
+        } catch (NumberFormatException e) {
+            System.out.println("Invalid input.");
+        }
+    }
+
+    public void viewCurrentScoreHistory() {
+        this.sessionManager.printCurrentSessionScores();
+    }
+
+    public void viewPreviousSessionScores() {
+        this.sessionManager.printAllSessionScores();
+    }
+
+    public void saveAndExit() throws IOException {
+        FileHandler fileHandler = new FileHandler();
+        
+        ArrayList<Score> currentScores = this.sessionManager.getCurrentSessionScores();
+        if (!currentScores.isEmpty()) {
+            fileHandler.writeSessionScores(currentScores, this.mapName, this.sessionId);
+        }
+
+        if (!this.allEvents.isEmpty()) {
+            fileHandler.writeEventsFile(this.eventsFile, this.allEvents, this.eventRows, this.eventCols);
+        }
+    }
+
     public ArrayList<ArrayList<MapPosition>> getMap() {
         ArrayList<ArrayList<MapPosition>> copyMap = new ArrayList<>();
         for (int i = 0; i < rows; i++) {
@@ -211,11 +454,6 @@ public class CampusMap {
             }
             copyMap.add(row);
         }
-    
         return copyMap;
     }
-
-    
-   
 }
-
