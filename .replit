@@ -20,7 +20,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "java CampusNavigatorEngine 7 8 123 data/maps/hawthorn.txt data/events/events1.txt"
+args = "cd src && java CampusNavigatorEngine 7 8 123 ../data/maps/hawthorn.txt ../data/events/events1.txt"
 
 [workflows.workflow.metadata]
 outputType = "console"

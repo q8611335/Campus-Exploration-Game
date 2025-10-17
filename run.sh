@@ -1,3 +1,7 @@
 #!/bin/bash
-# Example run command with sample data
-java CampusNavigatorEngine 7 6 123 data/maps/hawthorn.txt data/events/events1.txt
+# Compile first
+./compile.sh
+
+# Run with example arguments
+cd src
+java CampusNavigatorEngine 7 8 123 ../data/maps/hawthorn.txt ../data/events/events1.txt
