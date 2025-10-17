@@ -1,0 +1,5 @@
+row_id,col_id,event_type,date,start_time,end_time,score,name,speaker
+2,2,seminar,2024-05-14,09:00,10:30,8.7,Modern History,Dr. Alice Martin#Dr. Susan King
+2,2,exam,2024-05-18,15:00,16:30,8.9,Mathematics,
+3,3,lecture,2024-05-15,11:00,12:30,7.2,Discrete Mathematics,Dr. Tom Richardson
+2,3,lecture,2024-05-17,10:00,11:00,6.5,Linear Algebra,Dr. Sophia Ahmed
