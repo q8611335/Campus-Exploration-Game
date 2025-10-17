@@ -45,6 +45,10 @@ public class MapPosition {
         return new Place(this.place);
     }
 
+    public Place getPlaceReference() {
+        return this.place;
+    }
+
     public void setPlace(Place place) {
         this.place = place;
     }
@@ -60,6 +64,12 @@ public class MapPosition {
     public void removeEventById(int id) {
         if (this.place != null) {
             this.place.removeEventById(id);
+        }
+    }
+
+    public void addEvent(events.Event event) {
+        if (this.place != null) {
+            this.place.addEvent(event);
         }
     }
 }

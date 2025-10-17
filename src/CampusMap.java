@@ -150,7 +150,7 @@ public class CampusMap {
             }
 
             if (event != null) {
-                place.addEvent(event);
+                position.addEvent(event);
                 this.allEvents.add(event);
                 this.eventRows.add(row);
                 this.eventCols.add(col);
