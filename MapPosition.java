@@ -39,7 +39,9 @@ public class MapPosition {
     } //Notes: enums need not be deep copied
 
     public Place getPlace() {
-
+        if (this.place == null) {
+            return null;
+        }
         return new Place(this.place);
     }
 
@@ -55,7 +57,9 @@ public class MapPosition {
         this.place.setVisited(true);
     }
 
-    // public void removeEventById(int id) {
-    //     this.place.removeEventById(id);
-    // }
+    public void removeEventById(int id) {
+        if (this.place != null) {
+            this.place.removeEventById(id);
+        }
+    }
 }

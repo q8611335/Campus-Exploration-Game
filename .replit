@@ -1,3 +1,26 @@
-modules = ["python-3.11"]
+modules = ["python-3.11", "java", "java-graalvm22.3"]
 [agent]
 expertMode = true
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Campus Navigator"
+
+[[workflows.workflow]]
+name = "Campus Navigator"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "java CampusNavigatorEngine 7 8 123 data/maps/hawthorn.txt data/events/events1.txt"
+
+[workflows.workflow.metadata]
+outputType = "console"
