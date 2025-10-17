@@ -187,10 +187,14 @@ public class CampusMap {
                         System.out.print(Constants.LIBRARY_SYMBOL + " ");
                     } else if (place.getPlaceType() == PlaceType.SPORTS_CENTRE) {
                         System.out.print(Constants.SPORTS_CENTRE_SYMBOL + " ");
-                    } else if (place.hasEvents()) {
-                        System.out.print(Constants.getSymbol(MapPositionType.PLACE) + " ");
+                    } else if (place.getPlaceType() == PlaceType.LECTURE_HALL || place.getPlaceType() == PlaceType.EVENT_HALL) {
+                        if (place.hasEvents()) {
+                            System.out.print("@ ");
+                        } else {
+                            System.out.print(Constants.EMPTY_EVENT_SYMBOL + " ");
+                        }
                     } else {
-                        System.out.print(Constants.EMPTY_EVENT_SYMBOL + " ");
+                        System.out.print(". ");
                     }
                 }
             }
