@@ -180,7 +180,7 @@ public class CampusMap {
                 } else if (currentPos.getType() == MapPositionType.RESTRICTED) {
                     System.out.print(Constants.getSymbol(MapPositionType.RESTRICTED) + " ");
                 } else {
-                    Place place = currentPos.getPlace();
+                    Place place = currentPos.getPlaceReference();
                     if (place.getPlaceType() == PlaceType.CAFETERIA) {
                         System.out.print(Constants.CAFETERIA_SYMBOL + " ");
                     } else if (place.getPlaceType() == PlaceType.LIBRARY) {
